@@ -87,6 +87,16 @@ class AStar:
         goal: tuple (x, y) or (x, y, z)
         Returns: list of tuples representing the path
         """
+        path, _, _, _ = self.find_path_with_stats(start, goal)
+        return path
+
+    def find_path_with_stats(self, start, goal):
+        """
+        Find shortest path from start to goal using A* and return statistics
+        start: tuple (x, y) or (x, y, z)
+        goal: tuple (x, y) or (x, y, z)
+        Returns: (path, explored_nodes, max_frontier_size, nodes_evaluated)
+        """
         # Create start and goal nodes
         start_node = Node(*start)
         goal_node = Node(*goal)
@@ -95,11 +105,11 @@ class AStar:
         if self.is_3d:
             if (self.grid[start[0]][start[1]][start[2]] == 1 or
                     self.grid[goal[0]][goal[1]][goal[2]] == 1):
-                return None
+                return None, [], 0, 0
         else:
             if (self.grid[start[0]][start[1]] == 1 or
                     self.grid[goal[0]][goal[1]] == 1):
-                return None
+                return None, [], 0, 0
 
         # Initialize start node
         start_node.g = 0
@@ -112,18 +122,25 @@ class AStar:
 
         # Closed set (nodes already evaluated)
         closed_set = set()
+        explored_nodes = []  # Track order of exploration
 
         # Keep track of all nodes
         all_nodes = {start: start_node}
 
+        # Statistics
+        max_frontier_size = 1
+        nodes_evaluated = 0
+
         while open_set:
             current = heapq.heappop(open_set)
+            nodes_evaluated += 1
 
             # Check if we reached the goal
             if current == goal_node:
-                return self.reconstruct_path(current)
+                return self.reconstruct_path(current), explored_nodes, max_frontier_size, nodes_evaluated
 
             closed_set.add(current.coords)
+            explored_nodes.append(current.coords)
 
             # Explore neighbors
             for neighbor in self.get_neighbors(current):
@@ -152,4 +169,7 @@ class AStar:
                     if neighbor not in open_set:
                         heapq.heappush(open_set, neighbor)
 
-        return None  # No path found
+            # Update max frontier size
+            max_frontier_size = max(max_frontier_size, len(open_set))
+
+        return None, explored_nodes, max_frontier_size, nodes_evaluated
