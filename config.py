@@ -1,22 +1,40 @@
 """Configuration settings for A* Pathfinding"""
 
 # Grid dimensions
-DEFAULT_WIDTH = 8
-DEFAULT_HEIGHT = 8
+DEFAULT_WIDTH = 25
+DEFAULT_HEIGHT = 15
 DEFAULT_DEPTH = 8  # For 3D mode
+
+# Maze generation settings
+MAZE_RANDOM_SEED = None  # Set to integer for reproducible mazes
+MAZE_RANDOM_PATHS_PERCENTAGE = 0.05  # Percentage of additional paths (0.0-1.0)
 
 # Start and goal positions
 DEFAULT_START_2D = (0, 0)
-DEFAULT_GOAL_2D = (7, 7)
+DEFAULT_GOAL_2D = None  # Will be set to (height-1, width-1) if None
 DEFAULT_START_3D = (0, 0, 0)
-DEFAULT_GOAL_3D = (7, 7, 7)
+DEFAULT_GOAL_3D = None  # Will be set to (depth-1, height-1, width-1) if None
 
 # Visualization settings
 SHOW_VISUALIZATION = True
+SHOW_PLOT = True  # Show matplotlib plot if available
+PLOT_SAVE_PATH = None  # Set to filename to save plot instead of showing
+
+# Console visualization
 CONSOLE_SYMBOLS = {
     'walkable': '.',
     'obstacle': '#',
     'path': '*',
     'start': 'S',
     'goal': 'G'
+}
+
+# Plot colors (RGB values 0-1)
+PLOT_COLORS = {
+    'wall': [0.2, 0.2, 0.2],     # Dark gray
+    'empty': [0.95, 0.95, 0.95], # White
+    'explored': [0.8, 0.9, 1.0], # Light blue
+    'path': [1.0, 0.3, 0.3],     # Red
+    'start': [0, 0.8, 0],        # Green
+    'goal': [0.5, 0.2, 0.8]      # Purple
 }
