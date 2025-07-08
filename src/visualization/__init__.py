@@ -1,3 +1,3 @@
-from .visualizer import ConsoleVisualizer
+from .visualizer import ConsoleVisualizer, MatplotlibVisualizer
 
-__all__ = ['ConsoleVisualizer']
+__all__ = ['ConsoleVisualizer', 'MatplotlibVisualizer']
