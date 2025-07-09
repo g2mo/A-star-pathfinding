@@ -15,15 +15,17 @@ Options:
     --height HEIGHT     Grid height (default: from config)
     --no-visualize      Disable console visualization
     --no-plot           Disable matplotlib plot
-    --save-plot PATH    Save plot to file instead of displaying
+    --static            Use static plot instead of animated
+    --save-plot PATH    Save plot to file (png for static, gif/mp4 for animated)
+    --interval MS       Animation interval in milliseconds (default: 50)
     --mode {2d,3d}      Choose between 2D and 3D mode (default: 2d)
     --seed SEED         Random seed for maze generation
     --sample-maze       Use the sample maze instead of generating random
     --random-paths PCT  Percentage of random paths to add (0.0-1.0)
-    
+
 Author: Guglielmo Cimolai
-Date: 08/07/2025
-Version: 2
+Date: 09/07/2025
+Version: 3
 """
 
 import argparse
@@ -58,8 +60,16 @@ def parse_arguments():
         help='Disable matplotlib plot'
     )
     parser.add_argument(
+        '--static', action='store_true',
+        help='Use static plot instead of animated'
+    )
+    parser.add_argument(
         '--save-plot', type=str, default=config.PLOT_SAVE_PATH,
-        help='Save plot to file instead of displaying'
+        help='Save plot to file (png for static, gif/mp4 for animated)'
+    )
+    parser.add_argument(
+        '--interval', type=int, default=config.ANIMATION_INTERVAL,
+        help='Animation interval in milliseconds'
     )
     parser.add_argument(
         '--mode', choices=['2d', '3d'], default='2d',
@@ -90,9 +100,9 @@ def main():
         random.seed(args.seed)
         print(f"Using random seed: {args.seed}")
 
-    # For V3, we only support 2D visualization
+    # For V4, we only support 2D visualization
     if args.mode == '3d':
-        print("3D visualization not yet implemented in V3. Using 2D mode.")
+        print("3D visualization not yet implemented in V4. Using 2D mode.")
         args.mode = '2d'
 
     # Create or generate maze
@@ -159,7 +169,6 @@ def main():
     # Matplotlib visualization
     if not args.no_plot and config.SHOW_PLOT:
         if MatplotlibVisualizer.is_available():
-            print("\nGenerating visualization plot...")
             stats = {
                 'path_length': path_length,
                 'nodes_explored': nodes_explored,
@@ -167,10 +176,20 @@ def main():
                 'max_frontier': max_frontier,
                 'efficiency': efficiency
             }
-            MatplotlibVisualizer.plot_solution(
-                grid, path, explored_nodes, start, goal, stats,
-                save_path=args.save_plot
-            )
+
+            if args.static:
+                print("\nGenerating static visualization plot...")
+                MatplotlibVisualizer.plot_solution(
+                    grid, path, explored_nodes, start, goal, stats,
+                    save_path=args.save_plot
+                )
+            else:
+                print("\nGenerating animated visualization...")
+                print(f"Animation speed: {args.interval}ms per frame")
+                MatplotlibVisualizer.plot_solution_animated(
+                    grid, path, explored_nodes, start, goal, stats,
+                    interval=args.interval, save_path=args.save_plot
+                )
         else:
             print("\nMatplotlib not available. Install with: pip install matplotlib numpy")
 
