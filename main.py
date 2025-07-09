@@ -16,6 +16,8 @@ Options:
     --no-visualize      Disable console visualization
     --no-plot           Disable matplotlib plot
     --static            Use static plot instead of animated
+    --learning-mode     Enable learning mode to see g/h values
+    --no-learning-mode  Disable learning mode (overrides config)
     --save-plot PATH    Save plot to file (png for static, gif/mp4 for animated)
     --interval MS       Animation interval in milliseconds (default: 50)
     --mode {2d,3d}      Choose between 2D and 3D mode (default: 2d)
@@ -25,7 +27,7 @@ Options:
 
 Author: Guglielmo Cimolai
 Date: 09/07/2025
-Version: 3
+Version: 4
 """
 
 import argparse
@@ -63,6 +65,18 @@ def parse_arguments():
         '--static', action='store_true',
         help='Use static plot instead of animated'
     )
+
+    # Learning mode arguments - now properly handle config default
+    learning_group = parser.add_mutually_exclusive_group()
+    learning_group.add_argument(
+        '--learning-mode', action='store_true',
+        help='Enable learning mode to see g/h values during animation'
+    )
+    learning_group.add_argument(
+        '--no-learning-mode', action='store_true',
+        help='Disable learning mode (overrides config file setting)'
+    )
+
     parser.add_argument(
         '--save-plot', type=str, default=config.PLOT_SAVE_PATH,
         help='Save plot to file (png for static, gif/mp4 for animated)'
@@ -95,14 +109,24 @@ def main():
     """Main entry point"""
     args = parse_arguments()
 
+    # Determine learning mode setting
+    # Priority: CLI flag > config file
+    if args.learning_mode:
+        learning_mode = True
+    elif args.no_learning_mode:
+        learning_mode = False
+    else:
+        # Use config file setting if no CLI flag provided
+        learning_mode = config.LEARNING_MODE
+
     # Set random seed if provided
     if args.seed is not None:
         random.seed(args.seed)
         print(f"Using random seed: {args.seed}")
 
-    # For V4, we only support 2D visualization
+    # For V5, we only support 2D visualization
     if args.mode == '3d':
-        print("3D visualization not yet implemented in V4. Using 2D mode.")
+        print("3D visualization not yet implemented in V5. Using 2D mode.")
         args.mode = '2d'
 
     # Create or generate maze
@@ -111,9 +135,14 @@ def main():
         grid = MazeGenerator.create_sample_maze()
         height, width = len(grid), len(grid[0])
     else:
-        # Ensure odd dimensions for proper maze generation
-        width = args.width if args.width % 2 == 1 else args.width + 1
-        height = args.height if args.height % 2 == 1 else args.height + 1
+        # For learning mode, use smaller default size if not specified
+        if learning_mode and args.width == config.DEFAULT_WIDTH and args.height == config.DEFAULT_HEIGHT:
+            width, height = 21, 21
+            print("Note: Using 21x21 maze for better learning mode visibility")
+        else:
+            # Ensure odd dimensions for proper maze generation
+            width = args.width if args.width % 2 == 1 else args.width + 1
+            height = args.height if args.height % 2 == 1 else args.height + 1
 
         print(f"Generating random maze ({height}x{width})...")
         maze_gen = MazeGenerator(width, height)
@@ -128,15 +157,18 @@ def main():
     start = config.DEFAULT_START_2D
     goal = config.DEFAULT_GOAL_2D if config.DEFAULT_GOAL_2D else (height - 1, width - 1)
 
-    # Create pathfinder and find path with statistics
+    # Create pathfinder and find path with animation data
     print("\nFinding path with A* algorithm...")
+    if learning_mode:
+        print("LEARNING MODE is ON - Animation will show g (cost from start) and h (heuristic to goal) values")
+
     astar = AStar(grid)
-    path, explored_nodes, max_frontier, nodes_evaluated = astar.find_path_with_stats(start, goal)
+    path, animation_states, max_frontier, nodes_evaluated = astar.find_path_with_animation_data(start, goal)
 
     # Calculate statistics
     if path:
         path_length = len(path)
-        nodes_explored = len(explored_nodes)
+        nodes_explored = len(animation_states)
         efficiency = (path_length / nodes_explored) * 100 if nodes_explored > 0 else 0
 
         print(f"Path found! Length: {path_length}")
@@ -147,7 +179,7 @@ def main():
     else:
         print("No path found!")
         path_length = 0
-        nodes_explored = len(explored_nodes)
+        nodes_explored = len(animation_states)
         efficiency = 0
 
     # Show maze statistics
@@ -179,16 +211,25 @@ def main():
 
             if args.static:
                 print("\nGenerating static visualization plot...")
+                # For static plot, need to get explored nodes list
+                _, explored_nodes, _, _ = astar.find_path_with_stats(start, goal)
                 MatplotlibVisualizer.plot_solution(
                     grid, path, explored_nodes, start, goal, stats,
                     save_path=args.save_plot
                 )
             else:
                 print("\nGenerating animated visualization...")
-                print(f"Animation speed: {args.interval}ms per frame")
+                if learning_mode:
+                    print("Cost values shown: g (top), h (bottom)")
+                    interval = max(args.interval, config.LEARNING_MODE_INTERVAL)
+                else:
+                    interval = args.interval
+                print(f"Animation speed: {interval}ms per frame")
+
                 MatplotlibVisualizer.plot_solution_animated(
-                    grid, path, explored_nodes, start, goal, stats,
-                    interval=args.interval, save_path=args.save_plot
+                    grid, path, animation_states, start, goal, stats,
+                    interval=interval, learning_mode=learning_mode,
+                    save_path=args.save_plot
                 )
         else:
             print("\nMatplotlib not available. Install with: pip install matplotlib numpy")
