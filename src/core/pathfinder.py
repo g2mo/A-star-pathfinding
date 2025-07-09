@@ -1,7 +1,8 @@
 """A* pathfinding algorithm implementation"""
 
 import heapq
-from .node import Node
+from typing import List, Tuple, Optional, Dict
+from .node import Node, AlgorithmState
 
 
 class AStar:
@@ -97,6 +98,25 @@ class AStar:
         goal: tuple (x, y) or (x, y, z)
         Returns: (path, explored_nodes, max_frontier_size, nodes_evaluated)
         """
+        path, _, _, max_frontier_size, nodes_evaluated = self.find_path_with_animation_data(start, goal)
+        # Extract just the explored nodes for backward compatibility
+        explored_nodes = []
+        if path is not None:
+            # Get all explored nodes from animation states
+            astar_temp = AStar(self.grid)
+            _, animation_states, _, _ = astar_temp.find_path_with_animation_data(start, goal)
+            for state in animation_states:
+                explored_nodes.extend(state.explored_nodes)
+            # Remove duplicates while preserving order
+            seen = set()
+            explored_nodes = [x for x in explored_nodes if not (x in seen or seen.add(x))]
+        return path, explored_nodes, max_frontier_size, nodes_evaluated
+
+    def find_path_with_animation_data(self, start, goal):
+        """
+        Find shortest path from start to goal using A* and return animation data
+        Returns: (path, animation_states, max_frontier_size, nodes_evaluated)
+        """
         # Create start and goal nodes
         start_node = Node(*start)
         goal_node = Node(*goal)
@@ -119,28 +139,49 @@ class AStar:
         # Open set (nodes to be evaluated)
         open_set = []
         heapq.heappush(open_set, start_node)
+        open_set_dict = {start: start_node}  # For quick lookup
 
         # Closed set (nodes already evaluated)
         closed_set = set()
-        explored_nodes = []  # Track order of exploration
 
         # Keep track of all nodes
         all_nodes = {start: start_node}
+
+        # Animation states
+        animation_states = []
 
         # Statistics
         max_frontier_size = 1
         nodes_evaluated = 0
 
         while open_set:
+            # Capture state BEFORE popping the current node
+            frontier_data = {}
+            for coords, node in open_set_dict.items():
+                if coords not in closed_set:
+                    frontier_data[coords] = (node.g, node.h, node.f)
+
+            # Get the node with lowest f value
             current = heapq.heappop(open_set)
+            current_coords = current.coords
+            del open_set_dict[current_coords]
             nodes_evaluated += 1
+
+            # Capture current state with the node about to be evaluated
+            current_state = AlgorithmState(
+                explored_nodes=list(closed_set),
+                frontier=frontier_data.copy(),
+                current_node=current_coords
+            )
+            animation_states.append(current_state)
 
             # Check if we reached the goal
             if current == goal_node:
-                return self.reconstruct_path(current), explored_nodes, max_frontier_size, nodes_evaluated
+                path = self.reconstruct_path(current)
+                return path, animation_states, max_frontier_size, nodes_evaluated
 
-            closed_set.add(current.coords)
-            explored_nodes.append(current.coords)
+            # Mark as explored
+            closed_set.add(current_coords)
 
             # Explore neighbors
             for neighbor in self.get_neighbors(current):
@@ -166,10 +207,11 @@ class AStar:
                     neighbor.f = neighbor.g + neighbor.h
 
                     # Add to open set if not already there
-                    if neighbor not in open_set:
+                    if neighbor_tuple not in open_set_dict:
                         heapq.heappush(open_set, neighbor)
+                        open_set_dict[neighbor_tuple] = neighbor
 
             # Update max frontier size
             max_frontier_size = max(max_frontier_size, len(open_set))
 
-        return None, explored_nodes, max_frontier_size, nodes_evaluated
+        return None, animation_states, max_frontier_size, nodes_evaluated
