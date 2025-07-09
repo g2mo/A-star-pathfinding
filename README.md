@@ -38,6 +38,11 @@ Learning mode helps visualize how A* makes decisions:
 - Green cell: Current node being evaluated
 - f = g + h: Node with lowest f value is chosen next
 
+### Outputs
+<img width="800" alt="PLot1" src="https://github.com/user-attachments/assets/0aff24ce-7161-42e0-a79a-de91fbe336db" />
+<img width="800" alt="Plot2" src="https://github.com/user-attachments/assets/d3f55fd0-4324-4623-8bed-6442cf853177" />
+
+
 ### Usage
 
 Generate, solve, and animate a maze (basic usage):
