@@ -1,5 +1,8 @@
 """Node representation for pathfinding algorithms"""
 
+from dataclasses import dataclass
+from typing import List, Tuple, Dict, Optional
+
 
 class Node:
     """Represents a cell in the grid"""
@@ -32,3 +35,11 @@ class Node:
 
     def __hash__(self):
         return hash(self.coords)
+
+
+@dataclass
+class AlgorithmState:
+    """Captures the state of the algorithm at a specific step"""
+    explored_nodes: List[Tuple[int, ...]]
+    frontier: Dict[Tuple[int, ...], Tuple[float, float, float]]  # coords -> (g, h, f)
+    current_node: Optional[Tuple[int, ...]] = None
