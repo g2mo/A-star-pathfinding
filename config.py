@@ -24,6 +24,10 @@ PLOT_SAVE_PATH = None  # Set to filename to save plot instead of showing
 ANIMATE_PLOT = True  # Show animated visualization by default
 ANIMATION_INTERVAL = 50  # Milliseconds between frames (50ms = 20fps)
 
+# Learning mode settings
+LEARNING_MODE = False  # Set to True to show g/h values during animation
+LEARNING_MODE_INTERVAL = 150  # Slower animation for learning mode
+
 # Console visualization
 CONSOLE_SYMBOLS = {
     'walkable': '.',
@@ -35,10 +39,12 @@ CONSOLE_SYMBOLS = {
 
 # Plot colors (RGB values 0-1)
 PLOT_COLORS = {
-    'wall': [0.2, 0.2, 0.2],     # Dark gray
-    'empty': [0.95, 0.95, 0.95], # White
-    'explored': [0.8, 0.9, 1.0], # Light blue
-    'path': [1.0, 0.3, 0.3],     # Red
-    'start': [0, 0.8, 0],        # Green
-    'goal': [0.5, 0.2, 0.8]      # Purple
+    'wall': [0.2, 0.2, 0.2],  # Dark gray
+    'empty': [0.95, 0.95, 0.95],  # White
+    'explored': [0.8, 0.9, 1.0],  # Light blue
+    'frontier': [1.0, 1.0, 0.6],  # Light yellow
+    'current': [0.4, 1.0, 0.4],  # Light green
+    'path': [1.0, 0.3, 0.3],  # Red
+    'start': [0, 0.8, 0],  # Green
+    'goal': [0.5, 0.2, 0.8]  # Purple
 }
