@@ -1,13 +1,13 @@
 """Configuration settings for A* Pathfinding"""
 
 # Grid dimensions
-DEFAULT_WIDTH = 25
-DEFAULT_HEIGHT = 15
+DEFAULT_WIDTH = 45
+DEFAULT_HEIGHT = 27
 DEFAULT_DEPTH = 8  # For 3D mode
 
 # Maze generation settings
 MAZE_RANDOM_SEED = None  # Set to integer for reproducible mazes
-MAZE_RANDOM_PATHS_PERCENTAGE = 0.05  # Percentage of additional paths (0.0-1.0)
+MAZE_RANDOM_PATHS_PERCENTAGE = 0.25  # Percentage of additional paths (0.0-1.0)
 
 # Start and goal positions
 DEFAULT_START_2D = (0, 0)
@@ -19,6 +19,10 @@ DEFAULT_GOAL_3D = None  # Will be set to (depth-1, height-1, width-1) if None
 SHOW_VISUALIZATION = True
 SHOW_PLOT = True  # Show matplotlib plot if available
 PLOT_SAVE_PATH = None  # Set to filename to save plot instead of showing
+
+# Animation settings
+ANIMATE_PLOT = True  # Show animated visualization by default
+ANIMATION_INTERVAL = 50  # Milliseconds between frames (50ms = 20fps)
 
 # Console visualization
 CONSOLE_SYMBOLS = {
