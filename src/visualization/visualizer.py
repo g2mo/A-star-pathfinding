@@ -154,12 +154,15 @@ class MatplotlibVisualizer:
             plt.show()
 
     @staticmethod
-    def plot_solution_animated(grid, path, explored_nodes, start, goal, stats,
-                               interval=50, save_path=None):
-        """Create an animated plot showing the algorithm evolution"""
+    def plot_solution_animated(grid, path, animation_states, start, goal, stats,
+                               interval=50, learning_mode=False, save_path=None):
+        """Create an animated plot showing the algorithm evolution with optional learning mode"""
         if not MATPLOTLIB_AVAILABLE:
             print("Warning: matplotlib not available. Install with: pip install matplotlib numpy")
             return
+
+        # Import AlgorithmState if using animation states
+        from src.core.node import AlgorithmState
 
         # Convert grid to numpy array
         maze = np.array(grid)
@@ -176,6 +179,8 @@ class MatplotlibVisualizer:
             'wall': [0.2, 0.2, 0.2],  # Dark gray
             'empty': [0.95, 0.95, 0.95],  # White
             'explored': [0.8, 0.9, 1.0],  # Light blue
+            'frontier': [1.0, 1.0, 0.6],  # Light yellow
+            'current': [0.4, 1.0, 0.4],  # Light green
             'path': [1.0, 0.3, 0.3],  # Red
             'start': [0, 0.8, 0],  # Green
             'goal': [0.5, 0.2, 0.8]  # Purple
@@ -200,18 +205,23 @@ class MatplotlibVisualizer:
         ax.axis('off')
 
         # Add title
-        ax.set_title('A* Pathfinding Solution', fontsize=15, fontweight='bold', pad=20)
+        title_text = 'A* Pathfinding Algorithm Visualization'
+        if learning_mode:
+            title_text += ' (Learning Mode)'
+        ax.set_title(title_text, fontsize=15, fontweight='bold', pad=20)
 
         # Add statistics text (will be updated during animation)
         stats_text = ax.text(1.02, 0.95, '', transform=ax.transAxes, fontsize=10,
                              verticalalignment='top',
                              bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
 
-        # Add legend
+        # Add legend - always include frontier in legend
         legend_elements = [
             patches.Rectangle((0, 0), 1, 1, facecolor=colors['wall'], label='Wall'),
             patches.Rectangle((0, 0), 1, 1, facecolor=colors['empty'], label='Empty'),
             patches.Rectangle((0, 0), 1, 1, facecolor=colors['explored'], label='Explored'),
+            patches.Rectangle((0, 0), 1, 1, facecolor=colors['frontier'], label='Frontier'),
+            patches.Rectangle((0, 0), 1, 1, facecolor=colors['current'], label='Current'),
             patches.Rectangle((0, 0), 1, 1, facecolor=colors['path'], label='Path'),
             patches.Rectangle((0, 0), 1, 1, facecolor=colors['start'], label='Start'),
             patches.Rectangle((0, 0), 1, 1, facecolor=colors['goal'], label='Goal')
@@ -223,15 +233,26 @@ class MatplotlibVisualizer:
         # Adjust layout to prevent legend cutoff
         plt.tight_layout()
 
+        # Store text annotations for cells
+        cell_texts = {}
+
         # Animation state
         current_step = 0
         exploration_done = False
 
-        def update_stats_text(explored_count):
+        def update_stats_text(state_idx):
             """Update the statistics text"""
+            if state_idx < len(animation_states):
+                explored_count = len(animation_states[state_idx].explored_nodes)
+                frontier_size = len(animation_states[state_idx].frontier)
+            else:
+                explored_count = len(animation_states[-1].explored_nodes) if animation_states else 0
+                frontier_size = 0
+
             text = f"Path Length: {'-' if not exploration_done else stats['path_length']}\n"
             text += f"Nodes Explored: {explored_count}\n"
             text += f"Nodes Evaluated: {'-' if not exploration_done else stats['nodes_evaluated']}\n"
+            text += f"Current Frontier Size: {frontier_size}\n"
             text += f"Max Frontier Size: {'-' if not exploration_done else stats['max_frontier']}\n"
             efficiency_str = '-' if not exploration_done else f"{stats['efficiency']:.1f}%"
             text += f"Efficiency: {efficiency_str}"
@@ -242,39 +263,89 @@ class MatplotlibVisualizer:
             nonlocal current_step, exploration_done, display
 
             # Phase 1: Exploration
-            if current_step < len(explored_nodes):
-                # Add explored node
-                coords = explored_nodes[current_step]
-                x, y = coords[:2]  # Handle both 2D and 3D
-                if (x, y) != start[:2] and (x, y) != goal[:2]:
-                    display[x, y] = colors['explored']
+            if current_step < len(animation_states):
+                state = animation_states[current_step]
+
+                # Always reset display to base state (for frontier visualization)
+                for i in range(height):
+                    for j in range(width):
+                        if maze[i][j] == 1:  # Wall
+                            display[i, j] = colors['wall']
+                        else:  # Empty
+                            display[i, j] = colors['empty']
+
+                # Mark explored nodes
+                for coords in state.explored_nodes:
+                    x, y = coords[:2]
+                    if (x, y) != start[:2] and (x, y) != goal[:2]:
+                        display[x, y] = colors['explored']
+
+                # ALWAYS mark frontier nodes (not just in learning mode)
+                for coords in state.frontier.keys():
+                    x, y = coords[:2]
+                    if (x, y) != start[:2] and (x, y) != goal[:2]:
+                        display[x, y] = colors['frontier']
+
+                # Mark current node
+                if state.current_node and state.current_node[:2] != start[:2] and state.current_node[:2] != goal[:2]:
+                    display[state.current_node[0], state.current_node[1]] = colors['current']
+
+                # Handle text annotations only in learning mode
+                if learning_mode:
+                    # Clear previous texts
+                    for text in cell_texts.values():
+                        text.remove()
+                    cell_texts.clear()
+
+                    # Add text for frontier nodes showing g and h values
+                    for coords, (g, h, f) in state.frontier.items():
+                        x, y = coords[:2]
+                        text = ax.text(y, x, f'{int(g)}\n{int(h)}',
+                                       ha='center', va='center', fontsize=8,
+                                       color='black', weight='bold')
+                        cell_texts[coords] = text
+
+                # Mark start and goal
+                display[start[0], start[1]] = colors['start']
+                display[goal[0], goal[1]] = colors['goal']
 
                 # Update statistics
-                update_stats_text(current_step + 1)
+                update_stats_text(current_step)
                 current_step += 1
 
             # Phase 2: Path drawing
             elif path and not exploration_done:
                 exploration_done = True
+
+                # Clear any remaining texts in learning mode
+                if learning_mode:
+                    for text in cell_texts.values():
+                        text.remove()
+                    cell_texts.clear()
+
                 # Draw the final path
                 for coords in path:
-                    x, y = coords[:2]  # Handle both 2D and 3D
+                    x, y = coords[:2]
                     if (x, y) != start[:2] and (x, y) != goal[:2]:
                         display[x, y] = colors['path']
 
                 # Update final statistics
-                update_stats_text(len(explored_nodes))
+                update_stats_text(len(animation_states))
 
             # Update the image
             im.set_array(display)
-            return [im, stats_text]
+            return [im, stats_text] + list(cell_texts.values())
 
         # Calculate total frames needed
-        total_frames = len(explored_nodes) + (1 if path else 0)
+        total_frames = len(animation_states) + (1 if path else 0)
+
+        # Set interval based on learning mode
+        if learning_mode:
+            interval = max(interval, 250)  # Minimum 250ms for learning mode
 
         # Create animation
         anim = FuncAnimation(fig, animate, frames=total_frames,
-                             interval=interval, blit=True, repeat=False)
+                             interval=interval, blit=False, repeat=False)
 
         # Save or show animation
         if save_path:
