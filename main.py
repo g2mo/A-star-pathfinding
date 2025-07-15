@@ -13,6 +13,7 @@ Usage:
 Options:
     --width WIDTH       Grid width (default: from config)
     --height HEIGHT     Grid height (default: from config)
+    --depth DEPTH       Grid depth for 3D mode (default: from config)
     --no-visualize      Disable console visualization
     --no-plot           Disable matplotlib plot
     --static            Use static plot instead of animated
@@ -26,8 +27,8 @@ Options:
     --random-paths PCT  Percentage of random paths to add (0.0-1.0)
 
 Author: Guglielmo Cimolai
-Date: 09/07/2025
-Version: 4
+Date: 15/07/2025
+Version: 5
 """
 
 import argparse
@@ -46,12 +47,16 @@ def parse_arguments():
         description='A* Pathfinding Algorithm Implementation'
     )
     parser.add_argument(
-        '--width', type=int, default=config.DEFAULT_WIDTH,
-        help='Grid width (should be odd for proper maze generation)'
+        '--width', type=int, default=None,
+        help='Grid width (should be odd for proper 2D maze generation)'
     )
     parser.add_argument(
-        '--height', type=int, default=config.DEFAULT_HEIGHT,
-        help='Grid height (should be odd for proper maze generation)'
+        '--height', type=int, default=None,
+        help='Grid height (should be odd for proper 2D maze generation)'
+    )
+    parser.add_argument(
+        '--depth', type=int, default=None,
+        help='Grid depth for 3D mode'
     )
     parser.add_argument(
         '--no-visualize', action='store_true',
@@ -66,7 +71,7 @@ def parse_arguments():
         help='Use static plot instead of animated'
     )
 
-    # Learning mode arguments - now properly handle config default
+    # Learning mode arguments
     learning_group = parser.add_mutually_exclusive_group()
     learning_group.add_argument(
         '--learning-mode', action='store_true',
@@ -82,7 +87,7 @@ def parse_arguments():
         help='Save plot to file (png for static, gif/mp4 for animated)'
     )
     parser.add_argument(
-        '--interval', type=int, default=config.ANIMATION_INTERVAL,
+        '--interval', type=int, default=None,
         help='Animation interval in milliseconds'
     )
     parser.add_argument(
@@ -95,7 +100,7 @@ def parse_arguments():
     )
     parser.add_argument(
         '--sample-maze', action='store_true',
-        help='Use the sample maze instead of generating random'
+        help='Use the sample maze instead of generating random (2D only)'
     )
     parser.add_argument(
         '--random-paths', type=float, default=config.MAZE_RANDOM_PATHS_PERCENTAGE,
@@ -110,13 +115,11 @@ def main():
     args = parse_arguments()
 
     # Determine learning mode setting
-    # Priority: CLI flag > config file
     if args.learning_mode:
         learning_mode = True
     elif args.no_learning_mode:
         learning_mode = False
     else:
-        # Use config file setting if no CLI flag provided
         learning_mode = config.LEARNING_MODE
 
     # Set random seed if provided
@@ -124,26 +127,54 @@ def main():
         random.seed(args.seed)
         print(f"Using random seed: {args.seed}")
 
-    # For V5, we only support 2D visualization
+    # Determine dimensions based on mode
     if args.mode == '3d':
-        print("3D visualization not yet implemented in V5. Using 2D mode.")
-        args.mode = '2d'
+        # Use 3D defaults if not specified
+        width = args.width if args.width else config.DEFAULT_WIDTH_3D
+        height = args.height if args.height else config.DEFAULT_HEIGHT_3D
+        depth = args.depth if args.depth else config.DEFAULT_DEPTH_3D
+
+        # Set default interval for 3D if not specified
+        if args.interval is None:
+            interval = config.LEARNING_MODE_INTERVAL_3D if learning_mode else config.ANIMATION_INTERVAL_3D
+        else:
+            interval = args.interval
+    else:
+        # 2D mode
+        if args.sample_maze:
+            print("Using sample maze...")
+            grid = MazeGenerator.create_sample_maze()
+            height, width = len(grid), len(grid[0])
+        else:
+            # For learning mode, use smaller default size if not specified
+            if learning_mode and args.width is None and args.height is None:
+                width, height = 21, 21
+                print("Note: Using 21x21 maze for better learning mode visibility")
+            else:
+                # Use specified or default dimensions
+                width = args.width if args.width else config.DEFAULT_WIDTH
+                height = args.height if args.height else config.DEFAULT_HEIGHT
+                # Ensure odd dimensions for proper maze generation
+                width = width if width % 2 == 1 else width + 1
+                height = height if height % 2 == 1 else height + 1
+
+        depth = None
+
+        # Set default interval for 2D if not specified
+        if args.interval is None:
+            interval = config.LEARNING_MODE_INTERVAL if learning_mode else config.ANIMATION_INTERVAL
+        else:
+            interval = args.interval
 
     # Create or generate maze
-    if args.sample_maze:
-        print("Using sample maze...")
-        grid = MazeGenerator.create_sample_maze()
-        height, width = len(grid), len(grid[0])
-    else:
-        # For learning mode, use smaller default size if not specified
-        if learning_mode and args.width == config.DEFAULT_WIDTH and args.height == config.DEFAULT_HEIGHT:
-            width, height = 21, 21
-            print("Note: Using 21x21 maze for better learning mode visibility")
-        else:
-            # Ensure odd dimensions for proper maze generation
-            width = args.width if args.width % 2 == 1 else args.width + 1
-            height = args.height if args.height % 2 == 1 else args.height + 1
+    if args.mode == '3d':
+        print(f"Generating 3D maze ({depth}x{height}x{width})...")
+        print("Obstacles include: pillars, floating blocks, and wall segments")
+        maze_gen = MazeGenerator(width, height, depth)
+        grid = maze_gen.generate()
 
+        # No additional random paths for 3D - it's already sparse
+    elif not args.sample_maze:
         print(f"Generating random maze ({height}x{width})...")
         maze_gen = MazeGenerator(width, height)
         grid = maze_gen.generate()
@@ -154,13 +185,19 @@ def main():
             maze_gen.add_random_paths(args.random_paths)
 
     # Define start and goal
-    start = config.DEFAULT_START_2D
-    goal = config.DEFAULT_GOAL_2D if config.DEFAULT_GOAL_2D else (height - 1, width - 1)
+    if args.mode == '3d':
+        start = config.DEFAULT_START_3D
+        goal = config.DEFAULT_GOAL_3D if config.DEFAULT_GOAL_3D else (depth - 1, height - 1, width - 1)
+    else:
+        start = config.DEFAULT_START_2D
+        goal = config.DEFAULT_GOAL_2D if config.DEFAULT_GOAL_2D else (height - 1, width - 1)
 
     # Create pathfinder and find path with animation data
-    print("\nFinding path with A* algorithm...")
+    print(f"\nFinding path with {'3D' if args.mode == '3d' else '2D'} A* algorithm...")
     if learning_mode:
         print("LEARNING MODE is ON - Animation will show g (cost from start) and h (heuristic to goal) values")
+        if args.mode == '3d':
+            print("Cost values shown: g/h format")
 
     astar = AStar(grid)
     path, animation_states, max_frontier, nodes_evaluated = astar.find_path_with_animation_data(start, goal)
@@ -183,10 +220,18 @@ def main():
         efficiency = 0
 
     # Show maze statistics
-    total_cells = width * height
-    walkable_cells = sum(row.count(0) for row in grid)
+    if args.mode == '3d':
+        total_cells = width * height * depth
+        walkable_cells = sum(sum(sum(1 for cell in row if cell == 0) for row in layer) for layer in grid)
+    else:
+        total_cells = width * height
+        walkable_cells = sum(row.count(0) for row in grid)
+
     print(f"\nMaze statistics:")
-    print(f"- Size: {height}x{width}")
+    if args.mode == '3d':
+        print(f"- Size: {depth}x{height}x{width}")
+    else:
+        print(f"- Size: {height}x{width}")
     print(f"- Total cells: {total_cells}")
     print(f"- Walkable cells: {walkable_cells} ({walkable_cells / total_cells * 100:.1f}%)")
     print(f"- Obstacles: {total_cells - walkable_cells} ({(total_cells - walkable_cells) / total_cells * 100:.1f}%)")
@@ -194,8 +239,9 @@ def main():
     # Console visualization
     if not args.no_visualize:
         print("\nConsole visualization:")
-        print("Legend: S=Start, G=Goal, #=Wall, .=Empty, *=Path")
-        print("-" * (width * 2 - 1))
+        if args.mode == '2d':
+            print("Legend: S=Start, G=Goal, #=Wall, .=Empty, *=Path")
+            print("-" * (width * 2 - 1))
         ConsoleVisualizer.visualize_path(grid, path, start, goal)
 
     # Matplotlib visualization
@@ -209,7 +255,7 @@ def main():
                 'efficiency': efficiency
             }
 
-            if args.static:
+            if args.static and args.mode == '2d':
                 print("\nGenerating static visualization plot...")
                 # For static plot, need to get explored nodes list
                 _, explored_nodes, _, _ = astar.find_path_with_stats(start, goal)
@@ -218,13 +264,13 @@ def main():
                     save_path=args.save_plot
                 )
             else:
-                print("\nGenerating animated visualization...")
+                print(f"\nGenerating {'3D' if args.mode == '3d' else '2D'} animated visualization...")
                 if learning_mode:
-                    print("Cost values shown: g (top), h (bottom)")
-                    interval = max(args.interval, config.LEARNING_MODE_INTERVAL)
-                else:
-                    interval = args.interval
+                    print(
+                        "Cost values shown: g (top), h (bottom)" if args.mode == '2d' else "Cost values shown: g/h format")
                 print(f"Animation speed: {interval}ms per frame")
+                if args.mode == '3d':
+                    print("Use mouse to rotate, zoom, and pan the view!")
 
                 MatplotlibVisualizer.plot_solution_animated(
                     grid, path, animation_states, start, goal, stats,
