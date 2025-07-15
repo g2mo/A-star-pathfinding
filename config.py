@@ -1,9 +1,14 @@
 """Configuration settings for A* Pathfinding"""
 
 # Grid dimensions
-DEFAULT_WIDTH = 45
-DEFAULT_HEIGHT = 27
+DEFAULT_WIDTH = 25
+DEFAULT_HEIGHT = 15
 DEFAULT_DEPTH = 8  # For 3D mode
+
+# Default dimensions for 3D mode (smaller for performance)
+DEFAULT_WIDTH_3D = 8
+DEFAULT_HEIGHT_3D = 8
+DEFAULT_DEPTH_3D = 8
 
 # Maze generation settings
 MAZE_RANDOM_SEED = None  # Set to integer for reproducible mazes
@@ -23,10 +28,12 @@ PLOT_SAVE_PATH = None  # Set to filename to save plot instead of showing
 # Animation settings
 ANIMATE_PLOT = True  # Show animated visualization by default
 ANIMATION_INTERVAL = 50  # Milliseconds between frames (50ms = 20fps)
+ANIMATION_INTERVAL_3D = 10  # Faster for 3D to handle more frames
 
 # Learning mode settings
 LEARNING_MODE = False  # Set to True to show g/h values during animation
-LEARNING_MODE_INTERVAL = 150  # Slower animation for learning mode
+LEARNING_MODE_INTERVAL = 250  # Slower animation for learning mode
+LEARNING_MODE_INTERVAL_3D = 500  # Even slower for 3D learning mode
 
 # Console visualization
 CONSOLE_SYMBOLS = {
@@ -48,3 +55,7 @@ PLOT_COLORS = {
     'start': [0, 0.8, 0],  # Green
     'goal': [0.5, 0.2, 0.8]  # Purple
 }
+
+# 3D specific settings
+VOXEL_SIZE = 0.9  # Size of voxels in 3D visualization
+VOXEL_EDGE_WIDTH = 0.5  # Edge width for voxels
