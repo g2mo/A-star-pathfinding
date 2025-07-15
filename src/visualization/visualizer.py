@@ -5,6 +5,8 @@ try:
     import matplotlib.pyplot as plt
     import matplotlib.patches as patches
     from matplotlib.animation import FuncAnimation
+    from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
     import numpy as np
 
     MATPLOTLIB_AVAILABLE = True
@@ -18,35 +20,68 @@ class ConsoleVisualizer:
     @staticmethod
     def visualize_path(grid, path, start, goal):
         """Visualize the grid and path in console"""
-        # Create a copy of the grid for visualization
-        visual = [row[:] for row in grid]
+        # For 3D grids, show layer by layer
+        if isinstance(grid[0][0], list):  # 3D grid
+            depth = len(grid)
+            for z in range(depth):
+                print(f"\nLayer {z}:")
+                # Create a 2D slice
+                layer = grid[z]
+                visual = [row[:] for row in layer]
 
-        # Mark the path
-        if path:
-            for coords in path:
-                if len(coords) == 2:  # 2D
-                    x, y = coords
-                    if (x, y) != start and (x, y) != goal:
-                        visual[x][y] = 2  # Path marker
-                else:  # 3D - for now just print coordinates
-                    pass
+                # Mark the path in this layer
+                if path:
+                    for coords in path:
+                        if len(coords) == 3 and coords[0] == z:
+                            x, y, z_coord = coords
+                            if coords != start and coords != goal:
+                                visual[y][z_coord] = 2  # Path marker
 
-        # Mark start and goal for 2D
-        if len(start) == 2:
-            visual[start[0]][start[1]] = 3  # Start marker
-            visual[goal[0]][goal[1]] = 4  # Goal marker
+                # Mark start and goal if in this layer
+                if len(start) == 3 and start[0] == z:
+                    visual[start[1]][start[2]] = 3  # Start marker
+                if len(goal) == 3 and goal[0] == z:
+                    visual[goal[1]][goal[2]] = 4  # Goal marker
 
-        # Print the grid
-        symbols = {
-            0: '.',  # Walkable
-            1: '#',  # Obstacle
-            2: '*',  # Path
-            3: 'S',  # Start
-            4: 'G'  # Goal
-        }
+                # Print the layer
+                symbols = {
+                    0: '.',  # Walkable
+                    1: '#',  # Obstacle
+                    2: '*',  # Path
+                    3: 'S',  # Start
+                    4: 'G'  # Goal
+                }
 
-        for row in visual:
-            print(' '.join(symbols.get(cell, '?') for cell in row))
+                for row in visual:
+                    print(' '.join(symbols.get(cell, '?') for cell in row))
+        else:
+            # 2D visualization (existing code)
+            visual = [row[:] for row in grid]
+
+            # Mark the path
+            if path:
+                for coords in path:
+                    if len(coords) == 2:  # 2D
+                        x, y = coords
+                        if (x, y) != start and (x, y) != goal:
+                            visual[x][y] = 2  # Path marker
+
+            # Mark start and goal for 2D
+            if len(start) == 2:
+                visual[start[0]][start[1]] = 3  # Start marker
+                visual[goal[0]][goal[1]] = 4  # Goal marker
+
+            # Print the grid
+            symbols = {
+                0: '.',  # Walkable
+                1: '#',  # Obstacle
+                2: '*',  # Path
+                3: 'S',  # Start
+                4: 'G'  # Goal
+            }
+
+            for row in visual:
+                print(' '.join(symbols.get(cell, '?') for cell in row))
 
 
 class MatplotlibVisualizer:
@@ -64,7 +99,13 @@ class MatplotlibVisualizer:
             print("Warning: matplotlib not available. Install with: pip install matplotlib numpy")
             return
 
-        # Convert grid to numpy array
+        # Check if 3D
+        if isinstance(grid[0][0], list):
+            # For now, just show a message
+            print("Static 3D visualization not implemented. Use animated mode.")
+            return
+
+        # 2D visualization (existing code)
         maze = np.array(grid)
         height, width = maze.shape
 
@@ -156,11 +197,27 @@ class MatplotlibVisualizer:
     @staticmethod
     def plot_solution_animated(grid, path, animation_states, start, goal, stats,
                                interval=50, learning_mode=False, save_path=None):
-        """Create an animated plot showing the algorithm evolution with optional learning mode"""
+        """Create an animated plot showing the algorithm evolution"""
         if not MATPLOTLIB_AVAILABLE:
             print("Warning: matplotlib not available. Install with: pip install matplotlib numpy")
             return
 
+        # Check if 3D
+        if isinstance(grid[0][0], list):
+            MatplotlibVisualizer._plot_solution_3d_animated(
+                grid, path, animation_states, start, goal, stats,
+                interval, learning_mode, save_path
+            )
+        else:
+            MatplotlibVisualizer._plot_solution_2d_animated(
+                grid, path, animation_states, start, goal, stats,
+                interval, learning_mode, save_path
+            )
+
+    @staticmethod
+    def _plot_solution_2d_animated(grid, path, animation_states, start, goal, stats,
+                                   interval=50, learning_mode=False, save_path=None):
+        """2D animated visualization (existing code)"""
         # Import AlgorithmState if using animation states
         from src.core.node import AlgorithmState
 
@@ -169,7 +226,7 @@ class MatplotlibVisualizer:
         height, width = maze.shape
 
         # Create figure with proper size
-        fig, ax = plt.subplots(figsize=(12, 6))
+        fig, ax = plt.subplots(figsize=(12, 8))
 
         # Create base display array
         display = np.ones((height, width, 3))  # RGB array
@@ -361,4 +418,235 @@ class MatplotlibVisualizer:
                     print("Warning: Could not save animation. Install ffmpeg for video support.")
                     plt.show()
         else:
+            plt.show()
+
+    @staticmethod
+    def _plot_solution_3d_animated(grid, path, animation_states, start, goal, stats,
+                                   interval=50, learning_mode=False, save_path=None):
+        """Create an animated 3D plot"""
+        # Import AlgorithmState
+        from src.core.node import AlgorithmState
+
+        # Convert grid to numpy array
+        maze = np.array(grid)
+        depth, height, width = maze.shape
+
+        # Create figure
+        fig = plt.figure(figsize=(14, 10))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Set background color
+        ax.xaxis.pane.fill = False
+        ax.yaxis.pane.fill = False
+        ax.zaxis.pane.fill = False
+
+        # Define colors with alpha for transparency
+        colors = {
+            'wall': [0.4, 0.4, 0.4, 0.8],  # Gray obstacles
+            'empty': [0.95, 0.95, 0.95, 0.0],  # Transparent
+            'explored': [0.7, 0.85, 1.0, 0.7],  # Light blue
+            'frontier': [1.0, 0.9, 0.2, 0.9],  # Bright yellow
+            'current': [0.2, 1.0, 0.2, 1.0],  # Bright green
+            'path': [1.0, 0.2, 0.2, 1.0],  # Bright red
+            'start': [0, 0.8, 0, 1.0],  # Green
+            'goal': [0.6, 0.1, 1.0, 1.0]  # Bright purple
+        }
+
+        # Animation state
+        current_step = 0
+        exploration_done = False
+
+        # Store collections
+        wall_collections = []  # Persistent walls
+        dynamic_collections = []  # Changing elements
+        text_objects = []
+
+        def draw_voxel(x, y, z, color, size=0.9):
+            """Draw a single voxel (cube) at position (x, y, z)"""
+            # Define the vertices of a cube
+            r = size / 2
+            vertices = [
+                [x - r, y - r, z - r], [x + r, y - r, z - r],
+                [x + r, y + r, z - r], [x - r, y + r, z - r],  # Bottom
+                [x - r, y - r, z + r], [x + r, y - r, z + r],
+                [x + r, y + r, z + r], [x - r, y + r, z + r]  # Top
+            ]
+            vertices = np.array(vertices)
+
+            # Define the 6 faces of the cube
+            faces = [
+                [vertices[0], vertices[1], vertices[2], vertices[3]],  # Bottom
+                [vertices[4], vertices[5], vertices[6], vertices[7]],  # Top
+                [vertices[0], vertices[1], vertices[5], vertices[4]],  # Front
+                [vertices[2], vertices[3], vertices[7], vertices[6]],  # Back
+                [vertices[0], vertices[3], vertices[7], vertices[4]],  # Left
+                [vertices[1], vertices[2], vertices[6], vertices[5]]  # Right
+            ]
+
+            # Create the 3D polygon collection
+            poly = Poly3DCollection(faces, facecolors=[color] * 6,
+                                    edgecolors='black',
+                                    linewidths=0.5, alpha=color[3])
+            return poly
+
+        # Draw walls once at the beginning
+        print("Drawing maze obstacles...")
+        wall_count = 0
+        for x in range(depth):
+            for y in range(height):
+                for z in range(width):
+                    if maze[x][y][z] == 1:
+                        poly = draw_voxel(x, y, z, colors['wall'], size=0.98)
+                        ax.add_collection3d(poly)
+                        wall_collections.append(poly)
+                        wall_count += 1
+        print(f"Rendered {wall_count} obstacle voxels")
+
+        def update_stats_text(state_idx):
+            """Update the statistics text in title"""
+            if state_idx < len(animation_states):
+                explored_count = len(animation_states[state_idx].explored_nodes)
+                frontier_size = len(animation_states[state_idx].frontier)
+            else:
+                explored_count = len(animation_states[-1].explored_nodes) if animation_states else 0
+                frontier_size = 0
+
+            text = f"Path Length: {'-' if not exploration_done else stats['path_length']}\n"
+            text += f"Nodes Explored: {explored_count}\n"
+            text += f"Nodes Evaluated: {'-' if not exploration_done else stats['nodes_evaluated']}\n"
+            text += f"Current Frontier Size: {frontier_size}\n"
+            text += f"Max Frontier Size: {'-' if not exploration_done else stats['max_frontier']}\n"
+            efficiency_str = '-' if not exploration_done else f"{stats['efficiency']:.1f}%"
+            text += f"Efficiency: {efficiency_str}"
+
+            # Update title with stats
+            title_text = 'A* 3D Pathfinding Visualization'
+            if learning_mode:
+                title_text += ' (Learning Mode)\n'
+            ax.set_title(title_text + '\n' + text, fontsize=12, pad=20)
+
+        def animate(frame):
+            """Animation function"""
+            nonlocal current_step, exploration_done
+
+            # Clear only dynamic elements (not walls)
+            for coll in dynamic_collections:
+                coll.remove()
+            dynamic_collections.clear()
+
+            for text in text_objects:
+                text.remove()
+            text_objects.clear()
+
+            # Phase 1: Exploration
+            if current_step < len(animation_states):
+                state = animation_states[current_step]
+
+                # Draw explored nodes
+                for x, y, z in state.explored_nodes:
+                    if (x, y, z) != start and (x, y, z) != goal:
+                        poly = draw_voxel(x, y, z, colors['explored'], size=0.8)
+                        ax.add_collection3d(poly)
+                        dynamic_collections.append(poly)
+
+                # Draw frontier nodes
+                for (x, y, z), (g, h, f) in state.frontier.items():
+                    if (x, y, z) != start and (x, y, z) != goal:
+                        poly = draw_voxel(x, y, z, colors['frontier'], size=0.85)
+                        ax.add_collection3d(poly)
+                        dynamic_collections.append(poly)
+
+                        # Add text in learning mode
+                        if learning_mode:
+                            # Position text slightly above the voxel center
+                            text = ax.text(x, y, z + 0.6, f'{int(g)}/{int(h)}',
+                                           ha='center', va='center', fontsize=9,
+                                           color='black', weight='bold',
+                                           bbox=dict(boxstyle='round,pad=0.2',
+                                                     facecolor='yellow', alpha=0.8))
+                            text_objects.append(text)
+
+                # Draw current node
+                if state.current_node and state.current_node != start and state.current_node != goal:
+                    x, y, z = state.current_node
+                    poly = draw_voxel(x, y, z, colors['current'], size=0.9)
+                    ax.add_collection3d(poly)
+                    dynamic_collections.append(poly)
+
+                # Update statistics
+                update_stats_text(current_step)
+                current_step += 1
+
+            # Phase 2: Path drawing
+            else:
+                exploration_done = True
+
+                # Draw all explored nodes first
+                if animation_states:
+                    last_state = animation_states[-1]
+                    for x, y, z in last_state.explored_nodes:
+                        if (x, y, z) != start and (x, y, z) != goal:
+                            poly = draw_voxel(x, y, z, colors['explored'], size=0.8)
+                            ax.add_collection3d(poly)
+                            dynamic_collections.append(poly)
+
+                # Draw the final path
+                if path:
+                    for x, y, z in path:
+                        if (x, y, z) != start and (x, y, z) != goal:
+                            poly = draw_voxel(x, y, z, colors['path'], size=0.9)
+                            ax.add_collection3d(poly)
+                            dynamic_collections.append(poly)
+
+                # Update final statistics
+                update_stats_text(len(animation_states))
+
+            # Always draw start and goal
+            poly_start = draw_voxel(start[0], start[1], start[2], colors['start'], size=1.0)
+            ax.add_collection3d(poly_start)
+            dynamic_collections.append(poly_start)
+
+            poly_goal = draw_voxel(goal[0], goal[1], goal[2], colors['goal'], size=1.0)
+            ax.add_collection3d(poly_goal)
+            dynamic_collections.append(poly_goal)
+
+            # Set the axes properties
+            ax.set_xlim(-0.5, depth - 0.5)
+            ax.set_ylim(-0.5, height - 0.5)
+            ax.set_zlim(-0.5, width - 0.5)
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
+            ax.grid(True, alpha=0.3)
+
+            return dynamic_collections + text_objects
+
+        # Set initial view angle
+        ax.view_init(elev=20, azim=45)
+
+        # Calculate total frames
+        total_frames = len(animation_states) + (1 if path else 0)
+
+        # Set interval based on learning mode
+        if learning_mode:
+            interval = max(interval, 500)  # Slower for 3D learning mode
+
+        # Create animation
+        anim = FuncAnimation(fig, animate, frames=total_frames,
+                             interval=interval, blit=False, repeat=False)
+
+        # Show or save
+        if save_path:
+            if save_path.endswith('.gif'):
+                anim.save(save_path, writer='pillow', fps=1000 / interval)
+                print(f"3D animation saved to: {save_path}")
+            else:
+                try:
+                    anim.save(save_path, writer='ffmpeg', fps=1000 / interval)
+                    print(f"3D animation saved to: {save_path}")
+                except:
+                    print("Warning: Could not save animation. Install ffmpeg for video support.")
+                    plt.show()
+        else:
+            print("Use mouse to rotate, zoom, and pan the 3D view!")
             plt.show()
